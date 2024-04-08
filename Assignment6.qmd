@@ -10,23 +10,181 @@ format:
     embed-resources: true
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+**Question 1**
 
 ```{r}
-1 + 1
+knitr::include_graphics("Q1.jpg")
+
 ```
 
-You can add options to executable code like this
+MSE = 4.4 \
+RMSE = 2.097\
+MAE = 0.4**\
+\
+\
+Question 2**
 
 ```{r}
-#| echo: false
-2 * 2
+knitr::include_graphics("Q2.jpg")``
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+Accuracy: 70%
+
+```{r}
+knitr::include_graphics("Q2(ii).jpg")
+```
+
+**Question 3**
+
+```{r}
+knitr::include_graphics("Q3.jpg")
+```
+
+```{r}
+knitr::include_graphics("Q3(ii).jpg")
+```
+
+**Question 4**
+
+\(i\) In this population, a simple strategy for achieving the highest possible accuracy by guessing the same value for all observations would be to predict the value that occurs with the highest probability.
+
+Since it's known that 0.49 of the observations have a value of 0 and 0.51 of the observations have a value of 1, predicting the value of 1 for all observations would be the strategy that maximizes accuracy. This is because the value of 1 occurs more frequently than the value of 0.
+
+The accuracy achieved by this method would simply be the proportion of times the most common value occurs. Thus, if you predict 1 for all observations, the accuracy would be approximately 0.51 or 51%.
+
+\(ii\) In this population, the best strategy to maximize accuracy by guessing the same value for all observations would be to predict the more frequently occurring value.
+
+Given that 0.99 of the observations have a value of 0 and only 0.01 have a value of 1, you should predict 0 for all observations.
+
+The accuracy achieved by this method would be the proportion of the population that has the value 0, since you are predicting 0 for every observation. Therefore, the accuracy would be approximately 0.99 or 99%.
+
+(iii)\
+In datasets with a significant imbalance between classes (e.g., 99% of samples belong to one class), a high accuracy might not indicate a good model. A model could simply predict the majority class for all instances and still achieve high accuracy, but it would fail to correctly identify the minority class, which could be critical in contexts like fraud detection or disease diagnosis.\
+
+**Question 5**
+
+```{r}
+marbles <- read.csv("C:\\Users\\Sona\\Documents\\Sem 2\\Intro to Data Science\\Assignment6\\marbles.csv")
+```
+
+**(i)**
+
+```{r}
+install.packages("tidymodels")
+library(tidymodels)
+set.seed(20200229)
+marbles_split <- initial_split(data = marbles, prop = 0.80)
+marbles_train <- training(x = marbles_split)
+marbles_test <- testing(x = marbles_split)
+```
+
+**(ii)**
+
+```{r}
+marble_counts <- marbles %>%
+  count(size, color)
+
+ggplot(marble_counts, aes(x = size, y = n, fill = color)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(x = "Marble Size", y = "Count", fill = "Color", title = "Distribution of Marble Sizes by Color")
+```
+
+Decision Rule: \
+The majority black marbles are big and the majority small marbles would be white based on the visualization.
+
+**(iii)**
+
+```{r}
+predict_color <- function(size) {
+predicted_colors <- character(length(size))
+for(i in seq_along(size)) {
+if (size[i] == "big") {
+  predicted_colors[i] <- "Black"
+} else if (size[i] == "small") {
+  predicted_colors[i] <- "White"
+} else {
+  predicted_colors[i] <- unknown 
+}
+}
+return(predicted_colors)
+}
+marbles_test$predicted_color <- predict_color(marbles_test$size)
+```
+
+**(iv)**
+
+```{r}
+
+marbles_test$color <- tolower(marbles_test$color)
+marbles_test$predicted_color <- tolower(marbles_test$predicted_color)
+
+marbles_test$color <- factor(marbles_test$color, levels = c("black", "white"))
+marbles_test$predicted_color <- factor(marbles_test$predicted_color, levels = c("black", "white"))
+
+
+cf <- function(y, y_hat) {
+  y <- factor(y, levels = c("black","white"))
+  y_hat <- factor(y_hat, levels = levels(y))
+  
+  TP <- sum((y == 'black') & (y_hat == 'black'))
+  TN <- sum((y == 'white') & (y_hat == 'white'))
+  FP <- sum((y == 'white') & (y_hat == 'black'))
+  FN <- sum((y == 'black')&  (y_hat == 'white'))
+  
+  accuracy <- (TP + TN)/ length(y)
+  
+  conf_matrix <- matrix(c(TN, FP, FN, TP), nrow=2, dimnames = list('Actual'= c('white', 'black'),
+                  Predicted = c('white', 'black')))
+  return(list(accuracy = accuracy, confusion_matrix = conf_matrix))
+}
+
+
+results <- cf(marbles_test$color, marbles_test$predicted_color)
+
+print(paste("Accuracy:", results$accuracy))
+
+print(results$confusion_matrix)
+```
+
+**(v)**
+
+```{r}
+install.packages(c("parsnip", "rpart", "rpart.plot"))
+library(parsnip)
+library(rpart)
+library(rpart.plot) 
+
+tree_spec <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification") 
+
+tree_fit <- tree_spec %>% 
+  fit(color ~ ., data = marbles_train)
+
+predictions <- predict(tree_fit, new_data = marbles_test, type = "class")
+
+results_df <- tibble(
+  true = marbles_test$color, 
+  pred = predictions$.pred_class
+)
+
+results_df <- results_df %>%
+  mutate(
+    true = factor(true, levels = levels(marbles_test$color)),
+    pred = factor(pred, levels = levels(marbles_test$color))
+  )
+
+conf_matrix <- conf_mat(data = results_df, truth = true, estimate = pred)
+
+accuracy <- accuracy_vec(truth = marbles_test$color, estimate = predictions$.pred_class)
+
+accuracy_result <- accuracy_vec(truth = results_df$true, estimate = results_df$pred)
+print(accuracy_result)
+
+
+```
+
+**(vi)**
+
+The decision tree model generates the same accuracy as model 2.
